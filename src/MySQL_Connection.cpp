@@ -99,6 +99,48 @@ boolean MySQL_Connection::connect(IPAddress server, int port, char *user,
   return true;
 }
 
+boolean MySQL_Connection::connect(char* hostname, int port, char *user,
+                                  char *password, char *db)
+{
+  int connected = 0;
+  int retries = MAX_CONNECT_ATTEMPTS;
+
+  // Retry up to MAX_CONNECT_ATTEMPTS times.
+  while (retries--)
+  {
+    Serial.println("...trying...");
+    connected = client->connect(hostname, port);
+    if (connected != SUCCESS) {
+      Serial.print("...got: ");
+      Serial.print(connected);
+      Serial.println(" retrying...");
+      delay(CONNECT_DELAY_MS);
+    } else {
+      break;
+    }
+  }
+
+  if (connected != SUCCESS)
+    return false;
+
+  read_packet();
+  parse_handshake_packet();
+  send_authentication_packet(user, password, db);
+  read_packet();
+  if (get_packet_type() != MYSQL_OK_PACKET) {
+    parse_error_packet();
+    return false;
+  }
+
+  show_error(CONNECTED);
+
+  Serial.println(server_version);
+
+  free(server_version); // don't need it anymore
+  return true;
+}
+
+
 /*
   close - cancel the connection
 
